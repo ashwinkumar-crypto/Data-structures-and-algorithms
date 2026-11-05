@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DS Tracer v3</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--panel:#12121a;--border:#1e1e2e;--accent:#00f5a0;--accent2:#ff6b35;--accent3:#7c3aed;--accent4:#06b6d4;--text:#e2e8f0;--muted:#64748b;--node-bg:#1a1a2e;--highlight:#ffd700;--compare:#ff6b35;--sorted:#00f5a0;--pivot:#a855f7;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden;}
+header{padding:16px 28px 12px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:14px;}
+header h1{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent);}
+header span{font-size:.65rem;color:var(--muted);}
+.layout{display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 53px);}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:10px 0;}
+.sidebar-label{font-size:.55rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);padding:8px 14px 4px;}
+.algo-btn{display:block;width:100%;background:none;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.72rem;text-align:left;padding:7px 14px;cursor:pointer;transition:all .15s;border-left:3px solid transparent;}
+.algo-btn:hover{background:rgba(0,245,160,.05);color:var(--accent);}
+.algo-btn.active{background:rgba(0,245,160,.1);border-left-color:var(--accent);color:var(--accent);}
+.tag{font-size:.55rem;padding:1px 5px;border-radius:3px;margin-left:4px;background:rgba(124,58,237,.3);color:#a78bfa;}
+.tag.ll{background:rgba(6,182,212,.2);color:var(--accent4);}
+.tag.tree{background:rgba(255,107,53,.2);color:var(--accent2);}
+.tag.expr{background:rgba(255,215,0,.2);color:var(--highlight);}
+.main{display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOP TABS for expression tracer */
+.expr-tabs{display:flex;gap:6px;padding:10px 16px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--panel);}
+.expr-tab{font-family:'JetBrains Mono',monospace;font-size:.7rem;padding:7px 13px;border-radius:6px 6px 0 0;border:1px solid var(--border);border-bottom:none;background:var(--bg);color:var(--muted);cursor:pointer;transition:all .15s;}
+.expr-tab:hover{color:var(--text);}
+.expr-tab.active{background:var(--panel);color:var(--accent);border-color:var(--accent);}
+
+.controls{padding:8px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:46px;}
+.ctrl-label{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.ctrl-group{display:flex;align-items:center;gap:6px;}
+input[type=number],input[type=text]{background:var(--node-bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.75rem;padding:5px 8px;border-radius:4px;width:72px;}
+input[type=text]{width:180px;}
+.btn{font-family:'JetBrains Mono',monospace;font-size:.68rem;padding:5px 11px;border-radius:4px;border:1px solid;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700;}
+.btn-primary:hover{background:#00d488;}
+.btn-secondary{background:transparent;border-color:var(--border);color:var(--text);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-expr{background:var(--node-bg);border-color:var(--border);color:var(--text);font-size:.65rem;padding:5px 9px;border-radius:5px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .15s;}
+.btn-expr:hover,.btn-expr.active{border-color:var(--accent);color:var(--accent);}
+.speed-range{accent-color:var(--accent);width:70px;}
+.divider{width:1px;height:20px;background:var(--border);}
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:12px 18px;gap:10px;}
+.viz-area{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;overflow:auto;position:relative;flex:1;}
+.viz-title{font-size:.55rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);position:absolute;top:8px;left:11px;}
+.log-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;height:140px;overflow-y:auto;padding:8px 12px;}
+.log-title{font-size:.55rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:5px;}
+.log-line{font-size:.67rem;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:6px;}
+.log-step{color:var(--accent3);min-width:32px;}
+.log-msg{color:var(--text);}
+.log-line.key{color:var(--accent);}
+.log-line.swap{color:var(--accent2);}
+.log-line.done{color:var(--accent);font-weight:700;}
+.status-bar{font-size:.65rem;color:var(--accent4);padding:2px 0;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:2px 0;}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:.58rem;color:var(--muted);}
+.leg-dot{width:8px;height:8px;border-radius:2px;border:2px solid;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ====== ARRAY ====== */
+.iter-bar{width:100%;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:5px;padding:7px 12px;display:flex;gap:20px;margin-top:18px;margin-bottom:6px;flex-wrap:wrap;}
+.iter-var{display:flex;align-items:center;gap:5px;}
+.iter-var .vname{font-size:.6rem;color:var(--muted);}
+.iter-var .vval{font-size:.8rem;font-weight:700;color:#a78bfa;min-width:24px;text-align:center;}
+.iter-var .vval.active-i{color:var(--accent2);}
+.iter-var .vval.active-j{color:var(--highlight);}
+.cell{display:flex;flex-direction:column;align-items:center;margin:2px 2px;}
+.cell-val{width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;border:2px solid var(--border);border-radius:5px;background:var(--node-bg);transition:all .2s;}
+.cell-idx{font-size:.5rem;color:var(--muted);margin-top:2px;}
+.cell-val.highlight{background:rgba(255,215,0,.2);border-color:var(--highlight);color:var(--highlight);box-shadow:0 0 10px rgba(255,215,0,.3);}
+.cell-val.compare{background:rgba(255,107,53,.2);border-color:var(--compare);color:var(--compare);}
+.cell-val.sorted{background:rgba(0,245,160,.15);border-color:var(--sorted);color:var(--sorted);}
+.cell-val.pivot{background:rgba(168,85,247,.25);border-color:var(--pivot);color:var(--pivot);}
+.cell-val.found{background:rgba(0,245,160,.3);border-color:var(--accent);color:var(--accent);animation:pulse .5s ease 3;}
+.cell-val.current{border-color:var(--accent4);color:var(--accent4);background:rgba(6,182,212,.1);}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* ====== LINKED LIST ====== */
+.ll-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:0;padding-top:20px;}
+.ll-node-box{display:flex;flex-direction:column;align-items:center;}
+.ll-box{display:flex;border:2px solid var(--border);border-radius:6px;overflow:hidden;background:var(--node-bg);transition:all .2s;}
+.ll-box.sll .ll-data{border-right:1px solid var(--border);}
+.ll-box.dll{flex-direction:column;}
+.ll-box.dll .ll-row{display:flex;width:100%;}
+.ll-box.dll .ll-prev{padding:4px 7px;font-size:.58rem;color:var(--accent3);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-width:26px;text-align:center;}
+.ll-box.dll .ll-data-mid{padding:4px 9px;font-size:.8rem;font-weight:700;border-bottom:1px solid var(--border);flex:1;text-align:center;}
+.ll-box.dll .ll-next-r{padding:4px 7px;font-size:.58rem;color:var(--muted);border-bottom:1px solid var(--border);border-left:1px solid var(--border);min-width:26px;text-align:center;}
+.ll-box.dll .ll-addr{font-size:.5rem;color:var(--muted);padding:2px 6px;text-align:center;width:100%;}
+.ll-data{padding:6px 10px;font-size:.8rem;font-weight:700;min-width:32px;text-align:center;}
+.ll-next{padding:6px 8px;font-size:.58rem;color:var(--muted);min-width:24px;text-align:center;}
+.ll-arrow{font-size:.9rem;color:var(--accent4);margin:0 3px;align-self:center;}
+.ll-arrow.back{color:var(--accent3);}
+.ll-null{font-size:.65rem;color:var(--muted);padding:0 6px;align-self:center;}
+.ll-box.highlight{border-color:var(--highlight);}
+.ll-box.highlight .ll-data,.ll-box.highlight .ll-data-mid{color:var(--highlight);}
+.ll-box.found{border-color:var(--accent);}
+.ll-box.found .ll-data,.ll-box.found .ll-data-mid{color:var(--accent);}
+.ll-box.current{border-color:var(--accent4);}
+.ll-box.current .ll-data,.ll-box.current .ll-data-mid{color:var(--accent4);}
+.ll-box.compare{border-color:var(--compare);}
+.ll-box.compare .ll-data,.ll-box.compare .ll-data-mid{color:var(--compare);}
+.ll-box.sorted{border-color:var(--sorted);}
+.ll-box.sorted .ll-data,.ll-box.sorted .ll-data-mid{color:var(--sorted);}
+.ll-addr-label{font-size:.48rem;color:var(--accent3);margin-top:3px;}
+/* circular arrow */
+.cll-back-arrow{font-size:.65rem;color:var(--accent3);padding:0 5px;align-self:center;}
+
+/* ====== STACK / QUEUE ====== */
+.sq-cell{padding:8px 16px;border:2px solid var(--border);border-radius:5px;background:var(--node-bg);font-weight:700;font-size:.85rem;transition:all .2s;min-width:48px;text-align:center;}
+.sq-cell.top{border-color:var(--accent);color:var(--accent);background:rgba(0,245,160,.1);}
+.sq-cell.front{border-color:var(--accent4);color:var(--accent4);background:rgba(6,182,212,.1);}
+.sq-cell.back{border-color:var(--accent2);color:var(--accent2);background:rgba(255,107,53,.1);}
+.sq-label{font-size:.5rem;text-align:center;color:var(--muted);margin-top:2px;}
+
+/* ====== TREE ====== */
+.tree-svg-wrap{width:100%;overflow-x:auto;padding-top:20px;}
+svg.tree-svg{display:block;margin:0 auto;}
+.tree-node-circle{fill:var(--node-bg);stroke:var(--border);stroke-width:2;transition:fill .25s,stroke .25s;}
+.tree-node-circle.tn-current{fill:rgba(6,182,212,.18);stroke:var(--accent4);}
+.tree-node-circle.tn-done{fill:rgba(0,245,160,.18);stroke:var(--sorted);}
+.tree-edge{stroke:var(--border);stroke-width:1.5;fill:none;}
+.tree-edge.te-active{stroke:var(--accent4);stroke-width:2;}
+.tree-node-text{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none;}
+.trav-order{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+.trav-badge{padding:3px 9px;border-radius:4px;font-size:.65rem;font-weight:700;background:var(--node-bg);border:1px solid var(--border);color:var(--muted);transition:all .2s;}
+.trav-badge.active{border-color:var(--accent);color:var(--accent);background:rgba(0,245,160,.1);}
+
+/* ====== EXPRESSION TRACER ====== */
+.expr-section{display:flex;flex-direction:column;gap:10px;height:100%;overflow-y:auto;}
+.expr-preset-row{display:flex;gap:6px;flex-wrap:wrap;}
+.expr-io-row{display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;}
+.expr-box{background:var(--node-bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;}
+.expr-box-label{font-size:.55rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.expr-box-val{font-size:.95rem;font-weight:700;color:var(--accent);min-height:22px;}
+.expr-table{width:100%;border-collapse:collapse;font-size:.7rem;}
+.expr-table th{font-size:.55rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);}
+.expr-table td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+.expr-table tr:last-child td{border-bottom:none;}
+.expr-table tr.active-row td{background:rgba(0,245,160,.06);}
+.et-token{font-weight:700;color:var(--accent4);}
+.et-token.op{color:var(--accent2);}
+.et-token.paren{color:var(--highlight);}
+.et-token.end{color:var(--muted);}
+.et-action{color:var(--text);}
+.et-stack{color:#a78bfa;font-weight:700;}
+.et-output{color:var(--accent);font-weight:700;}
+.expr-stack-visual{display:flex;align-items:flex-end;gap:4px;margin-top:4px;}
+.expr-stack-cell{padding:5px 10px;border:1.5px solid var(--border);border-radius:4px;background:var(--node-bg);font-size:.75rem;font-weight:700;color:var(--text);transition:all .2s;}
+.expr-stack-cell.new{border-color:var(--accent);color:var(--accent);background:rgba(0,245,160,.1);}
+.prec-table{width:100%;border-collapse:collapse;font-size:.72rem;}
+.prec-table th{font-size:.55rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);text-align:left;padding:6px 12px;border-bottom:1px solid var(--border);}
+.prec-table td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);}
+.prec-op{font-size:.95rem;font-weight:700;color:var(--accent4);min-width:32px;display:inline-block;}
+</style>
+</head>
+<body>
+<header>
+  <h1>DS Tracer v3</h1>
+  <span>Array · Linked List · Stack · Queue · Tree · Expression</span>
+</header>
+<div class="layout">
+<nav class="sidebar">
+  <div class="sidebar-label">🔍 Search — Array</div>
+  <button class="algo-btn active" onclick="sel('linear-array')" id="btn-linear-array">Linear Search <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('binary-array')" id="btn-binary-array">Binary Search <span class="tag">ARR</span></button>
+  <div class="sidebar-label">🔍 Search — LL</div>
+  <button class="algo-btn" onclick="sel('linear-ll')" id="btn-linear-ll">Linear Search <span class="tag ll">SLL</span></button>
+  <div class="sidebar-label">⚙ Sort — Array</div>
+  <button class="algo-btn" onclick="sel('bubble-array')" id="btn-bubble-array">Bubble Sort <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('selection-array')" id="btn-selection-array">Selection Sort <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('insertion-array')" id="btn-insertion-array">Insertion Sort <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('merge-array')" id="btn-merge-array">Merge Sort <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('quick-array')" id="btn-quick-array">Quick Sort <span class="tag">ARR</span></button>
+  <div class="sidebar-label">⚙ Sort — LL</div>
+  <button class="algo-btn" onclick="sel('bubble-ll')" id="btn-bubble-ll">Bubble Sort <span class="tag ll">SLL</span></button>
+  <button class="algo-btn" onclick="sel('selection-ll')" id="btn-selection-ll">Selection Sort <span class="tag ll">SLL</span></button>
+  <button class="algo-btn" onclick="sel('insertion-ll')" id="btn-insertion-ll">Insertion Sort <span class="tag ll">SLL</span></button>
+  <div class="sidebar-label">🔗 Linked Lists</div>
+  <button class="algo-btn" onclick="sel('sll-ops')" id="btn-sll-ops">Singly LL <span class="tag ll">SLL</span></button>
+  <button class="algo-btn" onclick="sel('dll-ops')" id="btn-dll-ops">Doubly LL <span class="tag ll">DLL</span></button>
+  <button class="algo-btn" onclick="sel('cll-ops')" id="btn-cll-ops">Circular LL <span class="tag ll">CLL</span></button>
+  <div class="sidebar-label">📦 Stack</div>
+  <button class="algo-btn" onclick="sel('stack-array')" id="btn-stack-array">Stack — Array <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('stack-ll')" id="btn-stack-ll">Stack — LL <span class="tag ll">SLL</span></button>
+  <div class="sidebar-label">📬 Queue</div>
+  <button class="algo-btn" onclick="sel('queue-array')" id="btn-queue-array">Queue — Array <span class="tag">ARR</span></button>
+  <button class="algo-btn" onclick="sel('queue-ll')" id="btn-queue-ll">Queue — LL <span class="tag ll">SLL</span></button>
+  <div class="sidebar-label">🌳 Tree Traversal</div>
+  <button class="algo-btn" onclick="sel('inorder-tree')" id="btn-inorder-tree">Inorder <span class="tag tree">BST</span></button>
+  <button class="algo-btn" onclick="sel('preorder-tree')" id="btn-preorder-tree">Preorder <span class="tag tree">BST</span></button>
+  <button class="algo-btn" onclick="sel('postorder-tree')" id="btn-postorder-tree">Postorder <span class="tag tree">BST</span></button>
+  <button class="algo-btn" onclick="sel('levelorder-tree')" id="btn-levelorder-tree">Level Order <span class="tag tree">BST</span></button>
+  <button class="algo-btn" onclick="sel('bstsearch-tree')" id="btn-bstsearch-tree">BST Search <span class="tag tree">BST</span></button>
+  <div class="sidebar-label">🧮 Expression</div>
+  <button class="algo-btn" onclick="sel('expr')" id="btn-expr">Expression Tracer <span class="tag expr">EXP</span></button>
+</nav>
+
+<div class="main" id="main-panel">
+  <!-- normal controls -->
+  <div class="controls" id="normal-controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Data</span>
+      <input type="text" id="input-data" value="5,3,8,1,9,2,7,4,6">
+    </div>
+    <div class="ctrl-group" id="target-group" style="display:none">
+      <span class="ctrl-label">Target</span>
+      <input type="number" id="input-target" value="7" min="0" max="99">
+    </div>
+    <div class="divider"></div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Speed</span>
+      <input type="range" id="speed" class="speed-range" min="1" max="10" value="5">
+    </div>
+    <button class="btn btn-primary" onclick="runAlgo()">▶ Run</button>
+    <button class="btn btn-secondary" onclick="resetAlgo()">↺ Reset</button>
+    <div class="divider"></div>
+    <div class="ctrl-group" id="sq-ops" style="display:none">
+      <input type="number" id="sq-val" placeholder="val" style="width:52px" min="0" max="99">
+      <button class="btn btn-secondary" onclick="sqPush()">Push/Enq</button>
+      <button class="btn btn-secondary" onclick="sqPop()">Pop/Deq</button>
+      <button class="btn btn-secondary" onclick="sqPeek()">Peek</button>
+    </div>
+    <div class="ctrl-group" id="ll-ops" style="display:none">
+      <input type="number" id="ll-val" placeholder="val" style="width:52px" min="0" max="99">
+      <input type="number" id="ll-pos" placeholder="pos" style="width:52px" min="0" max="99">
+      <button class="btn btn-secondary" onclick="llInsert()">Insert</button>
+      <button class="btn btn-secondary" onclick="llDelete()">Delete</button>
+      <button class="btn btn-secondary" onclick="llSearch()">Search</button>
+    </div>
+  </div>
+
+  <div class="content" id="normal-content">
+    <div>
+      <div class="status-bar" id="status">Select an algorithm and click Run</div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="viz-area" id="viz">
+      <span style="color:var(--muted);font-size:.78rem">Select an algorithm →</span>
+    </div>
+    <div class="log-panel">
+      <div class="log-title">Trace Log</div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <!-- EXPRESSION PANEL (hidden by default) -->
+  <div id="expr-panel" style="display:none;flex:1;overflow:hidden;display:none;flex-direction:column;">
+    <div class="expr-tabs" id="expr-tabs">
+      <button class="expr-tab active" onclick="setExprMode('i2p')" id="etab-i2p">Infix → Postfix</button>
+      <button class="expr-tab" onclick="setExprMode('i2pre')" id="etab-i2pre">Infix → Prefix</button>
+      <button class="expr-tab" onclick="setExprMode('p2i')" id="etab-p2i">Postfix → Infix</button>
+      <button class="expr-tab" onclick="setExprMode('pre2i')" id="etab-pre2i">Prefix → Infix</button>
+      <button class="expr-tab" onclick="setExprMode('prec')" id="etab-prec">Precedence Ref</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);">
+      <span class="ctrl-label">Presets:</span>
+      <div class="expr-preset-row" id="expr-presets"></div>
+      <div class="divider"></div>
+      <span class="ctrl-label">Custom:</span>
+      <input type="text" id="expr-input" value="A + B * C" style="width:160px;">
+      <button class="btn btn-primary" onclick="runExpr()">▶ Trace</button>
+      <button class="btn btn-secondary" onclick="resetExpr()">↺ Reset</button>
+    </div>
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:12px 18px;gap:10px;">
+      <div id="expr-content" style="flex:1;overflow-y:auto;"></div>
+      <div class="log-panel">
+        <div class="log-title">Trace Log</div>
+        <div id="expr-log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+let currentAlgo='linear-array', isRunning=false, stopFlag=false, sqData=[], llData=[];
+let exprMode='i2p';
+
+/* ====================================================
+   NAVIGATION
+====================================================*/
+function sel(a){
+  document.querySelectorAll('.algo-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+a).classList.add('active');
+  currentAlgo=a; stopFlag=true; isRunning=false;
+  const isExpr=a==='expr';
+  document.getElementById('expr-panel').style.display=isExpr?'flex':'none';
+  document.getElementById('normal-controls').style.display=isExpr?'none':'flex';
+  document.getElementById('normal-content').style.display=isExpr?'none':'flex';
+  if(isExpr){document.getElementById('expr-panel').style.flexDirection='column';resetExpr();return;}
+
+  const isSQ=a.startsWith('stack')||a.startsWith('queue');
+  const isLL=a.endsWith('-ops');
+  document.getElementById('sq-ops').style.display=isSQ?'flex':'none';
+  document.getElementById('ll-ops').style.display=isLL?'flex':'none';
+  document.getElementById('target-group').style.display=(a.includes('search')&&!isLL)?'flex':'none';
+  updateLegend(); resetAlgo();
+}
+
+function spd(){return Math.round(1100-+document.getElementById('speed').value*100);}
+function sleep(ms){return new Promise(r=>{if(stopFlag)return r();setTimeout(r,ms);});}
+function getData(){return document.getElementById('input-data').value.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n));}
+function getTarget(){return parseInt(document.getElementById('input-target').value);}
+function setStatus(m){document.getElementById('status').textContent=m;}
+function clearLog(){document.getElementById('log').innerHTML='';}
+function log(step,msg,type=''){
+  const el=document.getElementById('log');
+  const d=document.createElement('div'); d.className='log-line '+type;
+  d.innerHTML=`<span class="log-step">S${step}</span><span class="log-msg">${msg}</span>`;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+}
+
+/* ====================================================
+   ARRAY RENDER
+====================================================*/
+function iterBar(vars){
+  const div=document.createElement('div'); div.className='iter-bar';
+  vars.forEach(v=>{
+    const item=document.createElement('div'); item.className='iter-var';
+    const n=document.createElement('span'); n.className='vname'; n.textContent=v.name+' =';
+    const vv=document.createElement('span'); vv.className='vval '+(v.cls||''); vv.textContent=v.val;
+    item.appendChild(n); item.appendChild(vv); div.appendChild(item);
+  });
+  return div;
+}
+function renderArray(arr,states={},iVars=[]){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Array Visualization</span>';
+  if(iVars.length) viz.appendChild(iterBar(iVars));
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px;';
+  const row=document.createElement('div'); row.style.cssText='display:flex;align-items:flex-end;gap:2px;';
+  arr.forEach((val,i)=>{
+    const cell=document.createElement('div'); cell.className='cell';
+    const box=document.createElement('div'); box.className='cell-val '+(states[i]||''); box.textContent=val;
+    const idx=document.createElement('div'); idx.className='cell-idx'; idx.textContent=i;
+    cell.appendChild(box); cell.appendChild(idx); row.appendChild(cell);
+  });
+  wrap.appendChild(row); viz.appendChild(wrap);
+}
+
+/* ====================================================
+   LINKED LIST RENDERS
+====================================================*/
+function renderSLL(nodes, states={}){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Singly Linked List</span>';
+  const wrap=document.createElement('div'); wrap.className='ll-wrap';
+  if(!nodes.length){wrap.innerHTML='<span style="color:var(--muted);font-size:.78rem;margin-top:20px">Empty → NULL</span>';viz.appendChild(wrap);return;}
+  nodes.forEach((val,i)=>{
+    const nodeWrap=document.createElement('div'); nodeWrap.className='ll-node-box';
+    const box=document.createElement('div'); box.className='ll-box sll '+(states[i]||'');
+    const data=document.createElement('div'); data.className='ll-data'; data.textContent=val;
+    const next=document.createElement('div'); next.className='ll-next'; next.textContent='→';
+    box.appendChild(data); box.appendChild(next);
+    const addrLbl=document.createElement('div'); addrLbl.className='ll-addr-label'; addrLbl.textContent='['+i+']';
+    nodeWrap.appendChild(box); nodeWrap.appendChild(addrLbl); wrap.appendChild(nodeWrap);
+    if(i<nodes.length-1){const a=document.createElement('span');a.className='ll-arrow';a.textContent='→';a.style.alignSelf='center';wrap.appendChild(a);}
+  });
+  const n=document.createElement('span'); n.className='ll-null'; n.style.alignSelf='center'; n.textContent='∅ NULL';
+  wrap.appendChild(n); viz.appendChild(wrap);
+}
+
+function renderDLL(nodes, states={}){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Doubly Linked List</span>';
+  const wrap=document.createElement('div'); wrap.className='ll-wrap'; wrap.style.flexWrap='wrap';
+  if(!nodes.length){wrap.innerHTML='<span style="color:var(--muted);font-size:.78rem;margin-top:20px">NULL ← → NULL</span>';viz.appendChild(wrap);return;}
+  const nullL=document.createElement('span'); nullL.className='ll-null'; nullL.style.alignSelf='center'; nullL.textContent='NULL'; wrap.appendChild(nullL);
+  nodes.forEach((val,i)=>{
+    const arrow1=document.createElement('div');arrow1.style.cssText='display:flex;flex-direction:column;align-items:center;align-self:center;margin:0 2px;';
+    arrow1.innerHTML='<span style="font-size:.65rem;color:var(--accent4)">→</span><span style="font-size:.65rem;color:var(--accent3)">←</span>';
+    wrap.appendChild(arrow1);
+    const nodeWrap=document.createElement('div'); nodeWrap.className='ll-node-box';
+    const box=document.createElement('div'); box.className='ll-box dll '+(states[i]||'');
+    const rowTop=document.createElement('div'); rowTop.className='ll-row';
+    const prev=document.createElement('div'); prev.className='ll-prev'; prev.textContent=i>0?'←prev':'NULL';
+    const dataMid=document.createElement('div'); dataMid.className='ll-data-mid'; dataMid.textContent=val;
+    const nextR=document.createElement('div'); nextR.className='ll-next-r'; nextR.textContent=i<nodes.length-1?'next→':'NULL';
+    rowTop.appendChild(prev); rowTop.appendChild(dataMid); rowTop.appendChild(nextR);
+    const addr=document.createElement('div'); addr.className='ll-addr'; addr.textContent='addr['+i+']';
+    box.appendChild(rowTop); box.appendChild(addr);
+    nodeWrap.appendChild(box); wrap.appendChild(nodeWrap);
+  });
+  const nullR=document.createElement('span');
+  const arrow2=document.createElement('div');arrow2.style.cssText='display:flex;flex-direction:column;align-items:center;align-self:center;margin:0 2px;';
+  arrow2.innerHTML='<span style="font-size:.65rem;color:var(--accent4)">→</span><span style="font-size:.65rem;color:var(--accent3)">←</span>';
+  wrap.appendChild(arrow2);
+  nullR.className='ll-null'; nullR.style.alignSelf='center'; nullR.textContent='NULL'; wrap.appendChild(nullR);
+  viz.appendChild(wrap);
+}
+
+function renderCLL(nodes, states={}, headMark=true){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Circular Linked List</span>';
+  const outer=document.createElement('div'); outer.style.cssText='display:flex;flex-direction:column;align-items:center;padding-top:18px;gap:6px;';
+  const wrap=document.createElement('div'); wrap.className='ll-wrap'; wrap.style.justifyContent='center';
+  if(!nodes.length){wrap.innerHTML='<span style="color:var(--muted);font-size:.78rem;margin-top:10px">Empty (head → NULL)</span>';outer.appendChild(wrap);viz.appendChild(outer);return;}
+  nodes.forEach((val,i)=>{
+    const nodeWrap=document.createElement('div'); nodeWrap.className='ll-node-box';
+    const box=document.createElement('div'); box.className='ll-box sll '+(states[i]||'');
+    const data=document.createElement('div'); data.className='ll-data'; data.textContent=val;
+    const next=document.createElement('div'); next.className='ll-next'; next.textContent='→';
+    box.appendChild(data); box.appendChild(next);
+    const lbl=document.createElement('div'); lbl.className='ll-addr-label';
+    lbl.textContent=(i===0&&headMark)?'HEAD':'['+i+']'; lbl.style.color=i===0?'var(--accent)':'var(--accent3)';
+    nodeWrap.appendChild(box); nodeWrap.appendChild(lbl); wrap.appendChild(nodeWrap);
+    if(i<nodes.length-1){const a=document.createElement('span');a.className='ll-arrow';a.textContent='→';a.style.alignSelf='center';wrap.appendChild(a);}
+  });
+  outer.appendChild(wrap);
+  // circular back arrow label
+  const circ=document.createElement('div');
+  circ.style.cssText='display:flex;align-items:center;gap:5px;font-size:.6rem;color:var(--accent3);margin-top:2px;';
+  circ.innerHTML='↩ last.next → HEAD (circular)';
+  outer.appendChild(circ);
+  viz.appendChild(outer);
+}
+
+/* ====================================================
+   LINKED LIST INTERACTIVE OPS
+====================================================*/
+function llRender(){
+  if(currentAlgo==='sll-ops') renderSLL(llData,{});
+  else if(currentAlgo==='dll-ops') renderDLL(llData,{});
+  else if(currentAlgo==='cll-ops') renderCLL(llData,{});
+}
+function llInsert(){
+  const v=parseInt(document.getElementById('ll-val').value);
+  const pos=parseInt(document.getElementById('ll-pos').value);
+  if(isNaN(v)) return;
+  const idx=isNaN(pos)||pos<0?llData.length:Math.min(pos,llData.length);
+  llData.splice(idx,0,v);
+  const type=currentAlgo==='sll-ops'?'SLL':currentAlgo==='dll-ops'?'DLL':'CLL';
+  log(llData.length,`INSERT ${v} at pos ${idx} → [${llData.join('→')}] (${type})`,'key');
+  setStatus(`Inserted ${v} at position ${idx}`);
+  llRender();
+}
+function llDelete(){
+  const v=parseInt(document.getElementById('ll-val').value);
+  const idx=llData.indexOf(v);
+  if(idx===-1){setStatus(`${v} not found`);return;}
+  llData.splice(idx,1);
+  log(llData.length+1,`DELETE ${v} (was at idx ${idx}) → [${llData.join('→')}]`,'swap');
+  setStatus(`Deleted ${v}`);
+  llRender();
+}
+function llSearch(){
+  const v=parseInt(document.getElementById('ll-val').value);
+  if(isNaN(v)) return;
+  const idx=llData.indexOf(v);
+  const s={};
+  if(idx!==-1){s[idx]='found';setStatus(`✓ Found ${v} at node ${idx}`);}
+  else setStatus(`✗ ${v} not in list`);
+  log(llData.length,`SEARCH ${v} → ${idx!==-1?'found at idx '+idx:'not found'}`);
+  if(currentAlgo==='sll-ops') renderSLL(llData,s);
+  else if(currentAlgo==='dll-ops') renderDLL(llData,s);
+  else renderCLL(llData,s);
+}
+
+/* ====================================================
+   STACK / QUEUE
+====================================================*/
+function renderStack(arr){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Stack (LIFO)</span>';
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:18px;';
+  const tl=document.createElement('div'); tl.style.cssText='font-size:.6rem;color:var(--accent);margin-bottom:1px;';
+  tl.textContent=arr.length?'↑ TOP':'Empty'; wrap.appendChild(tl);
+  for(let i=arr.length-1;i>=0;i--){
+    const item=document.createElement('div'); item.style.cssText='display:flex;flex-direction:column;align-items:center;';
+    const cell=document.createElement('div'); cell.className='sq-cell'+(i===arr.length-1?' top':''); cell.textContent=arr[i];
+    item.appendChild(cell);
+    if(i===arr.length-1){const l=document.createElement('div');l.className='sq-label';l.textContent='top['+i+']';item.appendChild(l);}
+    wrap.appendChild(item);
+  }
+  const base=document.createElement('div'); base.style.cssText='width:100px;height:3px;background:var(--border);border-radius:2px;margin-top:3px;';
+  wrap.appendChild(base); viz.appendChild(wrap);
+}
+function renderQueue(arr){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Queue (FIFO)</span>';
+  const wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:18px;';
+  const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:4px;';
+  const fl=document.createElement('div'); fl.style.cssText='font-size:.6rem;color:var(--accent4);margin-right:4px;'; fl.textContent='FRONT →'; row.appendChild(fl);
+  if(!arr.length){const e=document.createElement('div');e.style.cssText='color:var(--muted);font-size:.75rem;';e.textContent='(empty)';row.appendChild(e);}
+  arr.forEach((val,i)=>{
+    let cls='sq-cell';
+    if(i===0) cls+=' front';
+    if(i===arr.length-1&&arr.length>1) cls+=' back';
+    const cell=document.createElement('div'); cell.className=cls; cell.textContent=val; row.appendChild(cell);
+  });
+  const bl=document.createElement('div'); bl.style.cssText='font-size:.6rem;color:var(--accent2);margin-left:4px;'; bl.textContent='← REAR'; row.appendChild(bl);
+  wrap.appendChild(row); viz.appendChild(wrap);
+}
+function renderSQ(){if(currentAlgo.startsWith('stack')) renderStack(sqData); else renderQueue(sqData);}
+function sqPush(){
+  const v=parseInt(document.getElementById('sq-val').value);
+  if(isNaN(v)) return;
+  sqData.push(v);
+  const isSt=currentAlgo.startsWith('stack');
+  log(sqData.length,isSt?`PUSH ${v} → top=${v}`:`ENQUEUE ${v} → rear=${v}`);
+  setStatus(isSt?`Pushed ${v}. size=${sqData.length}`:`Enqueued ${v}. size=${sqData.length}`);
+  renderSQ();
+}
+function sqPop(){
+  if(!sqData.length){setStatus('Empty');return;}
+  const isSt=currentAlgo.startsWith('stack');
+  const val=isSt?sqData.pop():sqData.shift();
+  log(sqData.length+1,isSt?`POP → removed ${val}`:`DEQUEUE → removed ${val} from front`,'swap');
+  setStatus(isSt?`Popped ${val}. size=${sqData.length}`:`Dequeued ${val}. size=${sqData.length}`);
+  renderSQ();
+}
+function sqPeek(){
+  if(!sqData.length){setStatus('Empty');return;}
+  const isSt=currentAlgo.startsWith('stack');
+  const val=isSt?sqData[sqData.length-1]:sqData[0];
+  setStatus(isSt?`PEEK: top=${val}`:`PEEK: front=${val}`);
+  log(sqData.length,isSt?`PEEK top=${val}`:`PEEK front=${val}`,'key');
+}
+
+/* ====================================================
+   TREE
+====================================================*/
+function buildBST(vals){
+  let root=null;
+  function insert(node,v){
+    if(!node) return{val:v,left:null,right:null};
+    if(v<node.val) node.left=insert(node.left,v);
+    else if(v>node.val) node.right=insert(node.right,v);
+    return node;
+  }
+  vals.forEach(v=>{root=insert(root,v);});
+  return root;
+}
+function layoutTree(root){
+  const nodes=[],edges=[];let xC=0;
+  function assign(node,d){if(!node)return;assign(node.left,d+1);node._x=xC++;node._y=d;assign(node.right,d+1);}
+  assign(root,0);
+  function collect(node){if(!node)return;nodes.push(node);if(node.left){edges.push({from:node,to:node.left});collect(node.left);}if(node.right){edges.push({from:node,to:node.right});collect(node.right);}}
+  collect(root);return{nodes,edges};
+}
+let treeRoot=null,treeVisited=new Set(),treeOrder=[];
+function renderTree(highlighted=null,visitedSet=new Set(),orderArr=[]){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<span class="viz-title">Binary Search Tree</span>';
+  if(!treeRoot){viz.innerHTML+='<span style="color:var(--muted);font-size:.78rem;margin-top:20px;display:block">Build tree from data then Run</span>';return;}
+  const{nodes,edges}=layoutTree(treeRoot);
+  const R=20,hGap=42,vGap=55;
+  const maxX=Math.max(...nodes.map(n=>n._x));const maxY=Math.max(...nodes.map(n=>n._y));
+  const W=Math.max(380,(maxX+1)*hGap+R*2);const H=(maxY+1)*vGap+R*2+20;
+  const ox=R+hGap/2;
+  function cx(n){return ox+n._x*hGap;}function cy(n){return R+18+n._y*vGap;}
+  const wrap=document.createElement('div'); wrap.className='tree-svg-wrap';
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('width',W);svg.setAttribute('height',H);svg.classList.add('tree-svg');
+  edges.forEach(e=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',cx(e.from));line.setAttribute('y1',cy(e.from));line.setAttribute('x2',cx(e.to));line.setAttribute('y2',cy(e.to));
+    line.classList.add('tree-edge');if(highlighted===e.to.val)line.classList.add('te-active');svg.appendChild(line);
+  });
+  nodes.forEach(n=>{
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',cx(n));c.setAttribute('cy',cy(n));c.setAttribute('r',R);c.classList.add('tree-node-circle');
+    if(n.val===highlighted)c.classList.add('tn-current');else if(visitedSet.has(n.val))c.classList.add('tn-done');
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',cx(n));t.setAttribute('y',cy(n));t.classList.add('tree-node-text');t.textContent=n.val;
+    g.appendChild(c);g.appendChild(t);svg.appendChild(g);
+  });
+  wrap.appendChild(svg);viz.appendChild(wrap);
+  if(orderArr.length){
+    const lbl=document.createElement('div');lbl.style.cssText='font-size:.58rem;color:var(--muted);margin-top:7px;text-transform:uppercase;letter-spacing:1px;';lbl.textContent='Visit Order:';viz.appendChild(lbl);
+    const row=document.createElement('div');row.className='trav-order';
+    orderArr.forEach(v=>{const b=document.createElement('div');b.className='trav-badge'+(v===highlighted?' active':'');b.textContent=v;row.appendChild(b);});
+    viz.appendChild(row);
+  }
+}
+
+async function treeTraversal(type){
+  treeRoot=buildBST(getData());treeVisited=new Set();treeOrder=[];let step=0;
+  renderTree(null,treeVisited,treeOrder);log(++step,`Built BST from [${getData().join(', ')}]`);await sleep(spd());
+  async function inorder(node){if(!node||stopFlag)return;await inorder(node.left);if(stopFlag)return;treeOrder.push(node.val);setStatus(`Visiting ${node.val}`);renderTree(node.val,new Set(treeOrder.slice(0,-1)),treeOrder);log(++step,`Visit ${node.val} → [${treeOrder.join(', ')}]`,'key');await sleep(spd());treeVisited.add(node.val);await inorder(node.right);}
+  async function preorder(node){if(!node||stopFlag)return;treeOrder.push(node.val);setStatus(`Visiting ${node.val}`);renderTree(node.val,new Set(treeOrder.slice(0,-1)),treeOrder);log(++step,`Visit ${node.val} → [${treeOrder.join(', ')}]`,'key');await sleep(spd());treeVisited.add(node.val);await preorder(node.left);await preorder(node.right);}
+  async function postorder(node){if(!node||stopFlag)return;await postorder(node.left);await postorder(node.right);if(stopFlag)return;treeOrder.push(node.val);setStatus(`Visiting ${node.val}`);renderTree(node.val,new Set(treeOrder.slice(0,-1)),treeOrder);log(++step,`Visit ${node.val} → [${treeOrder.join(', ')}]`,'key');await sleep(spd());treeVisited.add(node.val);}
+  async function levelorder(root){if(!root)return;const q=[root];let lvl=0;while(q.length&&!stopFlag){const sz=q.length;log(++step,`Level ${lvl}: ${q.map(x=>x.val).join(', ')}`);for(let k=0;k<sz&&!stopFlag;k++){const node=q.shift();treeOrder.push(node.val);setStatus(`BFS Level ${lvl}: visiting ${node.val}`);renderTree(node.val,new Set(treeOrder.slice(0,-1)),treeOrder);log(++step,`Visit ${node.val}`,'key');await sleep(spd());treeVisited.add(node.val);if(node.left)q.push(node.left);if(node.right)q.push(node.right);}lvl++;}}
+  if(type==='inorder')await inorder(treeRoot);
+  else if(type==='preorder')await preorder(treeRoot);
+  else if(type==='postorder')await postorder(treeRoot);
+  else if(type==='levelorder')await levelorder(treeRoot);
+  if(!stopFlag){renderTree(null,treeVisited,treeOrder);setStatus(`✓ ${type}: [${treeOrder.join(', ')}]`);log(++step,`Done: [${treeOrder.join(', ')}]`,'done');}
+}
+async function bstSearch(){
+  treeRoot=buildBST(getData());const target=getTarget();let node=treeRoot,step=0;
+  renderTree(null,new Set(),[]);log(++step,`BST Search for ${target}`);await sleep(spd());
+  while(node&&!stopFlag){
+    renderTree(node.val,new Set(),[]);setStatus(`At ${node.val}: compare with ${target}`);
+    log(++step,`Node=${node.val}  ${node.val===target?'← MATCH!':node.val>target?'go LEFT':'go RIGHT'}`);
+    await sleep(spd());
+    if(node.val===target){renderTree(node.val,new Set([node.val]),[node.val]);setStatus(`✓ Found ${target}`);log(++step,`Found`,'done');return;}
+    node=target<node.val?node.left:node.right;
+  }
+  setStatus(`✗ ${target} not found`);log(++step,'Not found','swap');
+}
+
+/* ====================================================
+   SORT / SEARCH ALGOS
+====================================================*/
+async function linearSearchArray(){let arr=getData(),target=getTarget(),step=0;for(let i=0;i<arr.length;i++){if(stopFlag)return;renderArray(arr,{[i]:'highlight'},[{name:'i',val:i,cls:'active-i'},{name:'arr[i]',val:arr[i]},{name:'target',val:target}]);setStatus(`i=${i}: ${arr[i]} vs ${target}`);log(++step,`i=${i}  arr[i]=${arr[i]}${arr[i]===target?' ← MATCH!':''}`);await sleep(spd());if(arr[i]===target){renderArray(arr,{[i]:'found'},[{name:'FOUND',val:arr[i]}]);setStatus(`✓ Found at i=${i}`);log(++step,`Found`,'done');return;}}setStatus(`✗ Not found`);log(++step,'Not found','swap');}
+async function binarySearchArray(){let arr=[...getData()].sort((a,b)=>a-b),target=getTarget(),step=0;let lo=0,hi=arr.length-1;log(++step,`Sorted: [${arr.join(', ')}]`);while(lo<=hi){if(stopFlag)return;const mid=Math.floor((lo+hi)/2);const s={};for(let i=lo;i<=hi;i++)s[i]='current';s[mid]='highlight';renderArray(arr,s,[{name:'lo',val:lo,cls:'active-i'},{name:'mid',val:mid,cls:'active-j'},{name:'hi',val:hi},{name:'arr[mid]',val:arr[mid]}]);setStatus(`lo=${lo} mid=${mid} hi=${hi}  arr[mid]=${arr[mid]} vs ${target}`);log(++step,`lo=${lo} hi=${hi} mid=${mid} arr[mid]=${arr[mid]}`);await sleep(spd());if(arr[mid]===target){renderArray(arr,{[mid]:'found'},[{name:'FOUND',val:target}]);setStatus(`✓ Found at i=${mid}`);log(++step,`Found`,'done');return;}else if(arr[mid]<target){log(++step,`go right → lo=${mid+1}`,'key');lo=mid+1;}else{log(++step,`go left → hi=${mid-1}`,'key');hi=mid-1;}await sleep(spd()*.4);}setStatus(`✗ Not found`);log(++step,'Not found','swap');}
+async function linearSearchLL(){let arr=getData(),target=getTarget(),step=0;for(let i=0;i<arr.length;i++){if(stopFlag)return;renderSLL(arr,{[i]:'highlight'});setStatus(`i=${i}: ${arr[i]} vs ${target}`);log(++step,`i=${i}  node.data=${arr[i]}${arr[i]===target?' ← MATCH!':''}`);await sleep(spd());if(arr[i]===target){renderSLL(arr,{[i]:'found'});setStatus(`✓ Found at node ${i}`);log(++step,`Found`,'done');return;}}setStatus(`✗ Not found`);log(++step,'Not found','swap');}
+async function bubbleSortArray(){let arr=[...getData()],n=arr.length,step=0;const sorted=new Set();for(let i=0;i<n-1;i++){let sw=false;for(let j=0;j<n-i-1;j++){if(stopFlag)return;const s={};sorted.forEach(k=>s[k]='sorted');s[j]='highlight';s[j+1]='compare';renderArray(arr,s,[{name:'i',val:i,cls:'active-i'},{name:'j',val:j,cls:'active-j'},{name:'arr[j]',val:arr[j]},{name:'arr[j+1]',val:arr[j+1]}]);setStatus(`i=${i} j=${j}: ${arr[j]} vs ${arr[j+1]}`);log(++step,`i=${i} j=${j}  ${arr[j]} vs ${arr[j+1]}`);await sleep(spd());if(arr[j]>arr[j+1]){[arr[j],arr[j+1]]=[arr[j+1],arr[j]];log(++step,`Swap → [${arr.join(', ')}]`,'swap');sw=true;await sleep(spd()*.3);}}sorted.add(n-1-i);if(!sw)break;}const s={};arr.forEach((_,i)=>s[i]='sorted');renderArray(arr,s,[]);setStatus(`✓ Sorted`);log(++step,'Done','done');}
+async function selectionSortArray(){let arr=[...getData()],n=arr.length,step=0;const sorted=new Set();for(let i=0;i<n-1;i++){let minIdx=i;for(let j=i+1;j<n;j++){if(stopFlag)return;const s={};sorted.forEach(k=>s[k]='sorted');s[i]='pivot';s[minIdx]='compare';s[j]='highlight';renderArray(arr,s,[{name:'i',val:i,cls:'active-i'},{name:'j',val:j,cls:'active-j'},{name:'min@',val:minIdx}]);setStatus(`i=${i} j=${j}: min=${arr[minIdx]} vs arr[j]=${arr[j]}`);log(++step,`i=${i} j=${j}  arr[j]=${arr[j]} vs min=${arr[minIdx]}`);await sleep(spd());if(arr[j]<arr[minIdx]){minIdx=j;log(++step,`New min at j=${minIdx}`,'key');}}if(minIdx!==i){[arr[i],arr[minIdx]]=[arr[minIdx],arr[i]];log(++step,`Swap i=${i}↔${minIdx}`,'swap');}sorted.add(i);await sleep(spd()*.3);}sorted.add(n-1);const s={};arr.forEach((_,i)=>s[i]='sorted');renderArray(arr,s,[]);setStatus(`✓ Sorted`);log(++step,'Done','done');}
+async function insertionSortArray(){let arr=[...getData()],n=arr.length,step=0;for(let i=1;i<n;i++){let key=arr[i],j=i-1;log(++step,`i=${i}: insert key=${key}`);while(j>=0&&arr[j]>key){if(stopFlag)return;const s={};for(let k=0;k<i;k++)s[k]='sorted';s[j+1]='highlight';s[j]='compare';renderArray(arr,s,[{name:'i',val:i,cls:'active-i'},{name:'j',val:j,cls:'active-j'},{name:'key',val:key}]);setStatus(`shift arr[${j}]=${arr[j]} right for key=${key}`);log(++step,`shift ${arr[j]} right`,'swap');arr[j+1]=arr[j];j--;await sleep(spd());}arr[j+1]=key;log(++step,`Place key=${key} at ${j+1}`);await sleep(spd()*.3);}const s={};arr.forEach((_,i)=>s[i]='sorted');renderArray(arr,s,[]);setStatus(`✓ Sorted`);log(++step,'Done','done');}
+async function mergeSortArray(){let arr=[...getData()],step=[0];async function merge(a,l,m,r){let L=a.slice(l,m+1),R=a.slice(m+1,r+1),i=0,j=0,k=l;while(i<L.length&&j<R.length){if(stopFlag)return;const s={};for(let x=l;x<=r;x++)s[x]='compare';s[l+i]='highlight';s[m+1+j]='pivot';renderArray(a,s,[{name:'l',val:l,cls:'active-i'},{name:'m',val:m},{name:'r',val:r},{name:'L[i]',val:L[i]},{name:'R[j]',val:R[j]}]);setStatus(`Merge [${l}..${r}]: L[${i}]=${L[i]} vs R[${j}]=${R[j]}`);log(++step[0],`Compare ${L[i]} and ${R[j]}`);await sleep(spd());a[k++]=L[i]<=R[j]?L[i++]:R[j++];}while(i<L.length)a[k++]=L[i++];while(j<R.length)a[k++]=R[j++];const s={};for(let x=l;x<=r;x++)s[x]='sorted';renderArray(a,s,[]);log(++step[0],`Merged [${l}..${r}]: [${a.slice(l,r+1).join(', ')}]`,'key');await sleep(spd()*.3);}async function ms(a,l,r){if(l>=r)return;const m=Math.floor((l+r)/2);log(++step[0],`Split [${l}..${r}]`);await ms(a,l,m);await ms(a,m+1,r);await merge(a,l,m,r);}await ms(arr,0,arr.length-1);if(!stopFlag){const s={};arr.forEach((_,i)=>s[i]='sorted');renderArray(arr,s,[]);setStatus(`✓ Sorted`);log(++step[0],'Done','done');}}
+async function quickSortArray(){let arr=[...getData()],step=[0];async function partition(a,lo,hi){let pivot=a[hi],i=lo-1;log(++step[0],`Partition [${lo}..${hi}] pivot=${pivot}`);for(let j=lo;j<hi;j++){if(stopFlag)return lo;const s={};s[hi]='pivot';for(let k=lo;k<=i;k++)s[k]='sorted';s[j]='highlight';renderArray(a,s,[{name:'i',val:i,cls:'active-i'},{name:'j',val:j,cls:'active-j'},{name:'pivot',val:pivot}]);setStatus(`i=${i} j=${j}  arr[j]=${a[j]} vs pivot=${pivot}`);log(++step[0],`i=${i} j=${j}  arr[j]=${a[j]} vs pivot=${pivot}`);await sleep(spd());if(a[j]<=pivot){i++;[a[i],a[j]]=[a[j],a[i]];if(i!==j)log(++step[0],`Swap i=${i}↔j=${j}`,'swap');}}[a[i+1],a[hi]]=[a[hi],a[i+1]];log(++step[0],`Pivot ${pivot} → pos ${i+1}`,'key');return i+1;}async function qs(a,lo,hi){if(lo>=hi||stopFlag)return;const p=await partition(a,lo,hi);await qs(a,lo,p-1);await qs(a,p+1,hi);}await qs(arr,0,arr.length-1);if(!stopFlag){const s={};arr.forEach((_,i)=>s[i]='sorted');renderArray(arr,s,[]);setStatus(`✓ Sorted`);log(++step[0],'Done','done');}}
+async function bubbleSortLL(){let arr=[...getData()],n=arr.length,step=0;for(let i=0;i<n-1;i++){for(let j=0;j<n-i-1;j++){if(stopFlag)return;renderSLL(arr,{[j]:'highlight',[j+1]:'compare'});setStatus(`i=${i} j=${j}: ${arr[j]} vs ${arr[j+1]}`);log(++step,`i=${i} j=${j}  ${arr[j]} vs ${arr[j+1]}`);await sleep(spd());if(arr[j]>arr[j+1]){[arr[j],arr[j+1]]=[arr[j+1],arr[j]];log(++step,`Swap → [${arr.join('→')}]`,'swap');}}}const s={};arr.forEach((_,i)=>s[i]='sorted');renderSLL(arr,s);setStatus(`✓ Sorted LL`);log(++step,'Done','done');}
+async function selectionSortLL(){let arr=[...getData()],n=arr.length,step=0;for(let i=0;i<n-1;i++){let minIdx=i;for(let j=i+1;j<n;j++){if(stopFlag)return;renderSLL(arr,{[i]:'compare',[minIdx]:'highlight',[j]:'current'});setStatus(`i=${i} j=${j}: min=${arr[minIdx]} vs ${arr[j]}`);log(++step,`i=${i} j=${j}  ${arr[j]} vs min=${arr[minIdx]}`);await sleep(spd());if(arr[j]<arr[minIdx]){minIdx=j;log(++step,`New min at j=${minIdx}`,'key');}}if(minIdx!==i){[arr[i],arr[minIdx]]=[arr[minIdx],arr[i]];log(++step,`Swap data i=${i}↔${minIdx}`,'swap');}await sleep(spd()*.3);}const s={};arr.forEach((_,i)=>s[i]='sorted');renderSLL(arr,s);setStatus(`✓ Sorted LL`);log(++step,'Done','done');}
+async function insertionSortLL(){let arr=[...getData()],n=arr.length,step=0;const sorted=[arr[0]];for(let i=1;i<n;i++){let key=arr[i],j=sorted.length-1;log(++step,`i=${i}: insert key=${key}`);while(j>=0&&sorted[j]>key){if(stopFlag)return;renderSLL([...sorted,...arr.slice(i)],{[j]:'compare',[i]:'highlight'});setStatus(`shift ${sorted[j]} right for key=${key}`);log(++step,`shift ${sorted[j]}`,'swap');j--;await sleep(spd());}sorted.splice(j+1,0,key);log(++step,`Placed key=${key}: [${sorted.join('→')}]`);await sleep(spd()*.3);}const s={};sorted.forEach((_,i)=>s[i]='sorted');renderSLL(sorted,s);setStatus(`✓ Sorted LL`);log(++step,'Done','done');}
+
+/* ====================================================
+   EXPRESSION TRACER
+====================================================*/
+const PRESETS_I2P=['A + B * C','(A + B) * C','A * B + C * D','(A + B) * (C - D)','A ^ B ^ C'];
+const PRESETS_I2PRE=['A + B * C','(A + B) * C','A * B + C * D','(A + B) * (C - D)'];
+const PRESETS_P2I=['A B C * +','A B + C *','A B C D * + *','A B + C D - *'];
+const PRESETS_PRE2I=['+ A * B C','* + A B C','* + A B + C D','* + A B - C D'];
+
+function setExprMode(m){
+  exprMode=m;
+  document.querySelectorAll('.expr-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('etab-'+m).classList.add('active');
+  // update presets
+  const presetsEl=document.getElementById('expr-presets');
+  presetsEl.innerHTML='';
+  let presets=[];
+  if(m==='i2p') presets=PRESETS_I2P;
+  else if(m==='i2pre') presets=PRESETS_I2PRE;
+  else if(m==='p2i') presets=PRESETS_P2I;
+  else if(m==='pre2i') presets=PRESETS_PRE2I;
+  presets.forEach(p=>{
+    const btn=document.createElement('button'); btn.className='btn-expr'; btn.textContent=p;
+    btn.onclick=()=>{document.getElementById('expr-input').value=p;runExpr();};
+    presetsEl.appendChild(btn);
+  });
+  if(m==='prec'){document.getElementById('expr-presets').innerHTML='<span style="font-size:.6rem;color:var(--muted)">Operator precedence reference table</span>';}
+  document.getElementById('expr-content').innerHTML='';
+  document.getElementById('expr-log').innerHTML='';
+}
+
+function prec(op){return op==='^'?3:op==='*'||op==='/'?2:op==='+'||op==='-'?1:0;}
+function isOp(c){return ['+','-','*','/','**','^'].includes(c);}
+function isOperand(c){return /^[A-Za-z0-9]+$/.test(c) && !isOp(c);}
+
+// tokenize: split string into tokens
+function tokenize(s){return s.trim().split(/\s+/);}
+
+function runExpr(){
+  const s=document.getElementById('expr-input').value.trim();
+  document.getElementById('expr-log').innerHTML='';
+  if(exprMode==='i2p') traceI2P(s);
+  else if(exprMode==='i2pre') traceI2Pre(s);
+  else if(exprMode==='p2i') traceP2I(s);
+  else if(exprMode==='pre2i') tracePre2I(s);
+  else if(exprMode==='prec') showPrecTable();
+}
+function resetExpr(){document.getElementById('expr-content').innerHTML='';document.getElementById('expr-log').innerHTML='';}
+
+function exprLog(step,msg,type=''){
+  const el=document.getElementById('expr-log');
+  const d=document.createElement('div'); d.className='log-line '+type;
+  d.innerHTML=`<span class="log-step">S${step}</span><span class="log-msg">${msg}</span>`;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+}
+
+/* ---- Infix → Postfix (Shunting Yard) ---- */
+function traceI2P(expr){
+  const tokens=tokenize(expr);
+  const stack=[], output=[];
+  const rows=[];
+  tokens.forEach((tok,idx)=>{
+    let action='';
+    if(isOperand(tok)){
+      output.push(tok); action='Operand → output directly';
+    } else if(tok==='('){
+      stack.push(tok); action='Push ( onto stack';
+    } else if(tok===')'){
+      while(stack.length&&stack[stack.length-1]!=='(') output.push(stack.pop());
+      stack.pop(); action='Pop until ( → discard (';
+    } else if(isOp(tok)){
+      while(stack.length&&stack[stack.length-1]!=='('&&prec(stack[stack.length-1])>=prec(tok)&&tok!=='^'){
+        output.push(stack.pop());
+      }
+      stack.push(tok);
+      action='Push '+tok+' (lower/eq prec ops popped first)';
+    }
+    rows.push({tok,action,stack:[...stack],output:[...output]});
+    exprLog(idx+1,`[${tok}] ${action}  stack:[${[...stack].join(',')}]  out:[${output.join(' ')}]`);
+  });
+  // flush
+  while(stack.length){output.push(stack.pop());}
+  rows.push({tok:'(end)',action:'Pop all remaining operators',stack:[],output:[...output],isEnd:true});
+  exprLog(rows.length,'(end) Pop all remaining operators  output: '+output.join(' '),'done');
+  renderExprTable(expr,'Postfix (output)',output.join(' '),rows,tokens);
+}
+
+/* ---- Infix → Prefix ---- */
+function traceI2Pre(expr){
+  // reverse, swap parens, i2p, reverse
+  const tokens=tokenize(expr);
+  const reversed=[...tokens].reverse().map(t=>t==='('?')':t===')'?'(':t);
+  const stack=[], output=[];
+  const rows=[];
+  reversed.forEach((tok,idx)=>{
+    let action='';
+    if(isOperand(tok)){
+      output.push(tok); action='Operand → output';
+    } else if(tok==='('){
+      stack.push(tok); action='Push (';
+    } else if(tok===')'){
+      while(stack.length&&stack[stack.length-1]!=='(') output.push(stack.pop());
+      stack.pop(); action='Pop until (';
+    } else if(isOp(tok)){
+      while(stack.length&&stack[stack.length-1]!=='('&&prec(stack[stack.length-1])>prec(tok)){
+        output.push(stack.pop());
+      }
+      stack.push(tok); action='Push '+tok;
+    }
+    rows.push({tok,action,stack:[...stack],output:[...output]});
+    exprLog(idx+1,`[${tok}] ${action}  stack:[${[...stack].join(',')}]  out:[${output.join(' ')}]`);
+  });
+  while(stack.length) output.push(stack.pop());
+  const prefix=output.reverse().join(' ');
+  rows.push({tok:'(end)',action:'Reverse output → Prefix',stack:[],output:prefix.split(' '),isEnd:true});
+  exprLog(rows.length,'(end) Reversed → '+prefix,'done');
+  renderExprTable(expr,'Prefix (output)',prefix,rows,reversed);
+}
+
+/* ---- Postfix → Infix ---- */
+function traceP2I(expr){
+  const tokens=tokenize(expr);
+  const stack=[];
+  const rows=[];
+  tokens.forEach((tok,idx)=>{
+    let action='';
+    if(isOperand(tok)){
+      stack.push(tok); action='Operand → push onto stack';
+    } else if(isOp(tok)){
+      const b=stack.pop(), a=stack.pop();
+      const res='('+a+' '+tok+' '+b+')';
+      stack.push(res); action=`Pop ${a}, ${b} → push (${a} ${tok} ${b})`;
+    }
+    rows.push({tok,action,stack:[...stack],output:[...stack]});
+    exprLog(idx+1,`[${tok}] ${action}  stack:[${stack.join(' | ')}]`);
+  });
+  const result=stack[0]||'';
+  rows.push({tok:'(end)',action:'Top of stack = infix result',stack:[result],output:[result],isEnd:true});
+  exprLog(rows.length,'(end) Infix: '+result,'done');
+  renderExprTable(expr,'Infix (output)',result,rows,tokens);
+}
+
+/* ---- Prefix → Infix ---- */
+function tracePre2I(expr){
+  const tokens=tokenize(expr).reverse();
+  const stack=[];
+  const rows=[];
+  tokens.forEach((tok,idx)=>{
+    let action='';
+    if(isOperand(tok)){
+      stack.push(tok); action='Operand → push';
+    } else if(isOp(tok)){
+      const a=stack.pop(), b=stack.pop();
+      const res='('+a+' '+tok+' '+b+')';
+      stack.push(res); action=`Pop ${a}, ${b} → push (${a} ${tok} ${b})`;
+    }
+    rows.push({tok,action,stack:[...stack],output:[...stack]});
+    exprLog(idx+1,`[${tok}] ${action}  stack:[${stack.join(' | ')}]`);
+  });
+  const result=stack[0]||'';
+  rows.push({tok:'(end)',action:'Top of stack = infix result',stack:[result],output:[result],isEnd:true});
+  exprLog(rows.length,'(end) Infix: '+result,'done');
+  renderExprTable(expr,'Infix (output)',result,rows,[...tokens].reverse());
+}
+
+function renderExprTable(inputExpr, outputLabel, outputVal, rows, tokens){
+  const container=document.getElementById('expr-content');
+  container.innerHTML='';
+  const sec=document.createElement('div'); sec.className='expr-section';
+
+  // IO row
+  const io=document.createElement('div'); io.className='expr-io-row';
+  ['Input','','Output label'].forEach((lbl,i)=>{
+    const box=document.createElement('div'); box.className='expr-box';
+    box.innerHTML=`<div class="expr-box-label">${i===0?'Input Expression':i===1?outputLabel:'Numeric Value*'}</div>
+    <div class="expr-box-val">${i===0?inputExpr:i===1?outputVal:'—'}</div>`;
+    io.appendChild(box);
+  });
+  // fix the three boxes
+  io.children[0].querySelector('.expr-box-val').textContent=inputExpr;
+  io.children[1].querySelector('.expr-box-label').textContent=outputLabel;
+  io.children[1].querySelector('.expr-box-val').textContent=outputVal;
+  io.children[2].querySelector('.expr-box-label').textContent='Note';
+  io.children[2].querySelector('.expr-box-val').style.cssText='font-size:.65rem;color:var(--muted);';
+  io.children[2].querySelector('.expr-box-val').textContent='Uses A=1,B=2,C=3,D=4 for eval';
+  sec.appendChild(io);
+
+  // Stack visual (current top)
+  const sv=document.createElement('div'); sv.style.cssText='display:flex;align-items:center;gap:8px;';
+  const svLbl=document.createElement('span'); svLbl.style.cssText='font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;';svLbl.textContent='Final stack state:';
+  sv.appendChild(svLbl);
+  sec.appendChild(sv);
+
+  // Trace table
+  const tableWrap=document.createElement('div'); tableWrap.style.cssText='overflow-x:auto;';
+  const table=document.createElement('table'); table.className='expr-table';
+  table.innerHTML=`<thead><tr><th>TOKEN</th><th>ACTION</th><th>STACK</th><th>OUTPUT</th></tr></thead>`;
+  const tbody=document.createElement('tbody');
+  rows.forEach((row,ri)=>{
+    const tr=document.createElement('tr');
+    if(row.isEnd) tr.className='active-row';
+    const tokCls=row.isEnd?'end':isOperand(row.tok)?'':'op';
+    tr.innerHTML=`<td><span class="et-token ${tokCls}">${row.tok}</span></td>
+    <td class="et-action">${row.action}</td>
+    <td><span class="et-stack">[${row.stack.join(', ')}]</span></td>
+    <td><span class="et-output">${row.output.join(' ')}</span></td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); tableWrap.appendChild(table); sec.appendChild(tableWrap);
+  container.appendChild(sec);
+}
+
+function showPrecTable(){
+  const container=document.getElementById('expr-content');
+  container.innerHTML='';
+  const data=[
+    {op:'^',name:'Exponentiation',prec:3,assoc:'Right'},
+    {op:'* /',name:'Multiply / Divide',prec:2,assoc:'Left'},
+    {op:'+ -',name:'Add / Subtract',prec:1,assoc:'Left'},
+    {op:'( )',name:'Parentheses',prec:'–',assoc:'–'},
+  ];
+  const sec=document.createElement('div'); sec.style.cssText='padding:6px;';
+  const title=document.createElement('div'); title.style.cssText='font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;';title.textContent='Operator Precedence Reference';
+  sec.appendChild(title);
+  const table=document.createElement('table'); table.className='prec-table';
+  table.innerHTML=`<thead><tr><th>Operator</th><th>Name</th><th>Precedence</th><th>Associativity</th><th>Example</th></tr></thead>`;
+  const tbody=document.createElement('tbody');
+  data.forEach(row=>{
+    const tr=document.createElement('tr');
+    const examples={'^':'A ^ B ^ C = A ^ (B ^ C)','* /':'A * B / C → left to right','+ -':'A + B - C → left to right','( )':'Overrides all'};
+    tr.innerHTML=`<td><span class="prec-op">${row.op}</span></td><td style="color:var(--text)">${row.name}</td><td style="color:var(--accent);font-weight:700">${row.prec}</td><td style="color:var(--accent4)">${row.assoc}</td><td style="color:var(--muted);font-size:.65rem">${examples[row.op]||''}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); sec.appendChild(table);
+
+  // conversion rules
+  const rules=[
+    ['Infix → Postfix','Use stack (Shunting Yard): operands to output, operators to stack respecting precedence, flush on end'],
+    ['Infix → Prefix','Reverse infix, swap ( and ), apply I→P, reverse result'],
+    ['Postfix → Infix','Stack of strings: operands push, operators pop two and form (a op b)'],
+    ['Prefix → Infix','Reverse tokens, same as P→I but push order reversed'],
+  ];
+  const rulesTitle=document.createElement('div'); rulesTitle.style.cssText='font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:14px 0 8px;';rulesTitle.textContent='Conversion Algorithms';
+  sec.appendChild(rulesTitle);
+  rules.forEach(([name,desc])=>{
+    const item=document.createElement('div'); item.style.cssText='margin-bottom:7px;';
+    item.innerHTML=`<span style="color:var(--accent4);font-size:.7rem;font-weight:700">${name}</span> <span style="color:var(--muted);font-size:.65rem">— ${desc}</span>`;
+    sec.appendChild(item);
+  });
+  container.appendChild(sec);
+}
+
+/* ====================================================
+   RUN / RESET
+====================================================*/
+async function runAlgo(){
+  if(isRunning) return;
+  stopFlag=false; isRunning=true; clearLog(); setStatus('Running…');
+  const map={
+    'linear-array':linearSearchArray,'binary-array':binarySearchArray,'linear-ll':linearSearchLL,
+    'bubble-array':bubbleSortArray,'selection-array':selectionSortArray,'insertion-array':insertionSortArray,
+    'merge-array':mergeSortArray,'quick-array':quickSortArray,
+    'bubble-ll':bubbleSortLL,'selection-ll':selectionSortLL,'insertion-ll':insertionSortLL,
+  };
+  const isSQ=currentAlgo.startsWith('stack')||currentAlgo.startsWith('queue');
+  const isLLOps=currentAlgo.endsWith('-ops');
+  const treeMap={'inorder-tree':'inorder','preorder-tree':'preorder','postorder-tree':'postorder','levelorder-tree':'levelorder'};
+  if(isSQ){sqData=getData();setStatus('Use Push/Pop/Peek buttons');log(1,`Initialized [${sqData.join(', ')}]`);log(2,currentAlgo.startsWith('stack')?'LIFO — Stack':'FIFO — Queue');renderSQ();}
+  else if(isLLOps){llData=getData();setStatus('Use Insert/Delete/Search buttons');log(1,`Loaded [${llData.join(', ')}] into ${currentAlgo.replace('-ops','').toUpperCase()}`);llRender();}
+  else if(currentAlgo==='bstsearch-tree') await bstSearch();
+  else if(treeMap[currentAlgo]) await treeTraversal(treeMap[currentAlgo]);
+  else if(map[currentAlgo]) await map[currentAlgo]();
+  isRunning=false;
+}
+
+function resetAlgo(){
+  stopFlag=true; isRunning=false; sqData=[]; llData=[];
+  clearLog(); setStatus('Ready');
+  const isTree=currentAlgo.endsWith('-tree');
+  const isSQ=currentAlgo.startsWith('stack')||currentAlgo.startsWith('queue');
+  const isLLOps=currentAlgo.endsWith('-ops');
+  const isLL=currentAlgo.endsWith('-ll')&&!isTree&&!isLLOps;
+  if(isSQ){if(currentAlgo.startsWith('stack'))renderStack([]);else renderQueue([]);}
+  else if(isLLOps){
+    if(currentAlgo==='sll-ops')renderSLL(getData(),{});
+    else if(currentAlgo==='dll-ops')renderDLL(getData(),{});
+    else renderCLL(getData(),{});
+    llData=getData();
+  }
+  else if(isTree){treeRoot=buildBST(getData());treeVisited=new Set();treeOrder=[];renderTree(null,new Set(),[]);}
+  else if(isLL)renderSLL(getData(),{});
+  else renderArray(getData(),{});
+}
+
+function updateLegend(){
+  const isSQ=currentAlgo.startsWith('stack')||currentAlgo.startsWith('queue');
+  const isLLOps=currentAlgo.endsWith('-ops');
+  const isTree=currentAlgo.endsWith('-tree');
+  const el=document.getElementById('legend');
+  if(isSQ||isLLOps){el.innerHTML='';return;}
+  if(isTree){el.innerHTML=`<div class="leg-item"><div class="leg-dot" style="border-color:var(--accent4)"></div> Current</div><div class="leg-item"><div class="leg-dot" style="border-color:var(--sorted)"></div> Visited</div>`;return;}
+  el.innerHTML=`
+    <div class="leg-item"><div class="leg-dot" style="border-color:var(--highlight)"></div> i (outer)</div>
+    <div class="leg-item"><div class="leg-dot" style="border-color:var(--compare)"></div> j (inner)</div>
+    <div class="leg-item"><div class="leg-dot" style="border-color:var(--sorted)"></div> Sorted/Found</div>
+    <div class="leg-item"><div class="leg-dot" style="border-color:var(--pivot)"></div> Pivot</div>`;
+}
+
+// INIT
+sel('linear-array');
+document.getElementById('target-group').style.display='flex';
+</script>
+</body>
+</html>
